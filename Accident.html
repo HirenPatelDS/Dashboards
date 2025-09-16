@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accident Tracking Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .month-selector {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 12px 20px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .month-selector:hover {
+            background: rgba(51, 65, 85, 0.8);
+            border-color: #06b6d4;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #06b6d4, #3b82f6);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(6, 182, 212, 0.1);
+            border-color: rgba(6, 182, 212, 0.3);
+        }
+
+        .kpi-title {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+
+        .kpi-change {
+            font-size: 0.85rem;
+            color: #06b6d4;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .chart-container.wide {
+            grid-column: span 2;
+        }
+
+        .chart-container.full-width {
+            grid-column: span 3;
+        }
+
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .chart-container.wide {
+                grid-column: span 2;
+            }
+            
+            .chart-container.full-width {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-container.wide,
+            .chart-container.full-width {
+                grid-column: span 1;
+            }
+        }
+
+        .chart-container {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.05);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-wrapper.small {
+            height: 200px;
+        }
+
+        .chart-wrapper.large {
+            height: 400px;
+        }
+
+        .bar-chart-horizontal {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-label {
+            min-width: 80px;
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .bar-visual {
+            flex: 1;
+            height: 24px;
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #06b6d4, #0891b2);
+            border-radius: 12px;
+            transition: width 0.8s ease;
+        }
+
+        .bar-value {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>Accident Tracking Dashboard</h1>
+            <select class="month-selector" id="monthSelector">
+                <option value="2025-06">2025 June</option>
+                <option value="2025-05">2025 May</option>
+                <option value="2025-04">2025 April</option>
+            </select>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card loading">
+                <div class="kpi-title">Total Accidents</div>
+                <div class="kpi-value">37</div>
+            </div>
+            <div class="kpi-card loading">
+                <div class="kpi-title">Departmental %</div>
+                <div class="kpi-value">2.7<span style="font-size: 1.5rem;">%</span></div>
+            </div>
+            <div class="kpi-card loading">
+                <div class="kpi-title">Non-Departmental %</div>
+                <div class="kpi-value">86.49<span style="font-size: 1.5rem;">%</span></div>
+            </div>
+            <div class="kpi-card loading">
+                <div class="kpi-title">Total Accident MoM Change %</div>
+                <div class="kpi-value">76.19<span style="font-size: 1.5rem;">%</span></div>
+                <div class="kpi-change">↗ Month over Month</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container loading">
+                <div class="chart-title">Total Fatal and Non Fatal</div>
+                <div class="chart-wrapper">
+                    <canvas id="fatalChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container loading wide">
+                <div class="chart-title">Departmental vs Outsider vs Total Accidents</div>
+                <div class="chart-wrapper">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container loading">
+                <div class="chart-title">Total Accident by Discom</div>
+                <div class="chart-wrapper small">
+                    <div class="bar-chart-horizontal">
+                        <div class="bar-item">
+                            <div class="bar-label">UGVCL</div>
+                            <div class="bar-visual">
+                                <div class="bar-fill" style="width: 30%;"></div>
+                                <div class="bar-value">6</div>
+                            </div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="bar-label">PGVCL</div>
+                            <div class="bar-visual">
+                                <div class="bar-fill" style="width: 90%;"></div>
+                                <div class="bar-value">18</div>
+                            </div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="bar-label">MGVCL</div>
+                            <div class="bar-visual">
+                                <div class="bar-fill" style="width: 40%;"></div>
+                                <div class="bar-value">8</div>
+                            </div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="bar-label">DGVCL</div>
+                            <div class="bar-visual">
+                                <div class="bar-fill" style="width: 25%;"></div>
+                                <div class="bar-value">5</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container loading">
+                <div class="chart-title">Accident Count by PGVCL</div>
+                <div class="chart-wrapper small">
+                    <canvas id="pgvclChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container loading">
+                <div class="chart-title">Accident Count by DGVCL</div>
+                <div class="chart-wrapper small">
+                    <canvas id="dgvclChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container loading">
+                <div class="chart-title">Accident Count by MGVCL</div>
+                <div class="chart-wrapper small">
+                    <canvas id="mgvclChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container loading">
+                <div class="chart-title">Accident Count by UGVCL</div>
+                <div class="chart-wrapper small">
+                    <canvas id="ugvclChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Chart.js default configuration
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.3)';
+        Chart.defaults.backgroundColor = 'rgba(6, 182, 212, 0.1)';
+
+        // Fatal vs Non-Fatal Pie Chart
+        const fatalCtx = document.getElementById('fatalChart').getContext('2d');
+        new Chart(fatalCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Fatal', 'Non-Fatal'],
+                datasets: [{
+                    data: [16.2, 83.8],
+                    backgroundColor: ['#ef4444', '#06b6d4'],
+                    borderWidth: 0,
+                    cutout: '70%'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+
+        // Trend Line Chart
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [
+                    {
+                        label: 'Departmental',
+                        data: [20, 18, 15, 12, 14, 16, 18, 20, 22, 25, 28, 30],
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        tension: 0.4,
+                        fill: false
+                    },
+                    {
+                        label: 'Outsider',
+                        data: [15, 17, 16, 18, 20, 22, 24, 23, 25, 27, 26, 28],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: false
+                    },
+                    {
+                        label: 'Total Accidents',
+                        data: [35, 35, 31, 30, 34, 38, 42, 43, 47, 52, 54, 58],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // PGVCL Bar Chart
+        const pgvclCtx = document.getElementById('pgvclChart').getContext('2d');
+        new Chart(pgvclCtx, {
+            type: 'bar',
+            data: {
+                labels: ['ANJAR', 'MORBI', 'RAJKOT-2', 'SURENDRA NAGAR', 'RAJKOT CITY', 'BHAVNAGA R', 'BOTAD', 'JAMNAGAR', 'JUNAGADH', 'KACHCHH', 'AMRELI'],
+                datasets: [{
+                    data: [5, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1],
+                    backgroundColor: '#06b6d4',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+
+        // DGVCL Bar Chart
+        const dgvclCtx = document.getElementById('dgvclChart').getContext('2d');
+        new Chart(dgvclCtx, {
+            type: 'bar',
+            data: {
+                labels: ['VALSAD', 'BHARUCH', 'SURAT', 'SURAT CITY'],
+                datasets: [{
+                    data: [2, 1, 1, 1],
+                    backgroundColor: '#06b6d4',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // MGVCL Bar Chart
+        const mgvclCtx = document.getElementById('mgvclChart').getContext('2d');
+        new Chart(mgvclCtx, {
+            type: 'bar',
+            data: {
+                labels: ['GODHRA', 'ANAND', 'BARODA', 'BARODA(CITY)', 'NADIAD'],
+                datasets: [{
+                    data: [3, 2, 1, 1, 1],
+                    backgroundColor: '#06b6d4',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // UGVCL Bar Chart
+        const ugvclCtx = document.getElementById('ugvclChart').getContext('2d');
+        new Chart(ugvclCtx, {
+            type: 'bar',
+            data: {
+                labels: ['HIMMATNA GAR', 'PALANPUR', 'SABARMAT I', 'MEHSANA'],
+                datasets: [{
+                    data: [2, 2, 1, 1],
+                    backgroundColor: '#06b6d4',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Add loading animation
+        setTimeout(() => {
+            document.querySelectorAll('.loading').forEach((el, index) => {
+                setTimeout(() => {
+                    el.style.opacity = '1';
+                }, index * 100);
+            });
+        }, 100);
+
+        // Month selector functionality
+        document.getElementById('monthSelector').addEventListener('change', function() {
+            // Simulate data update
+            console.log('Month changed to:', this.value);
+        });
+    </script>
+</body>
+</html>
+
